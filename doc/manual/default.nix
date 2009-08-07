@@ -1,12 +1,15 @@
-{nixpkgs ? ../../../nixpkgs}:
+{pkgs}:
 
 let
 
-  pkgs = import nixpkgs {};
+  manualConfig =
+    { environment.checkConfigurationOptions = false;
+      services.nixosManual.enable = false;
+    };
 
   options = builtins.toFile "options.xml" (builtins.unsafeDiscardStringContext
     (builtins.toXML (pkgs.lib.optionAttrSetToDocList ""
-      (import ../../system/system.nix {inherit nixpkgs; configuration = {};}).optionDeclarations)));
+      (import ../../lib/eval-config.nix {inherit pkgs; configuration = manualConfig;}).optionDeclarations)));
 
   optionsDocBook = pkgs.runCommand "options-db.xml" {} ''
     ${pkgs.libxslt}/bin/xsltproc -o $out ${./options-to-docbook.xsl} ${options} 
@@ -30,16 +33,28 @@ let
     '';
 
     buildCommand = ''
-      ensureDir $out
+      
       ln -s $sources/*.xml .
       ln -s ${optionsDocBook} options-db.xml
+
+      dst=$out/share/doc/nixos
+      ensureDir $dst
       xsltproc $xsltFlags --nonet --xinclude \
-        --output $out/manual.html \
-        ${pkgs.docbook5_xsl}/xml/xsl/docbook/html/docbook.xsl \
+        --output $dst/manual.html \
+        ${pkgs.docbook5_xsl}/xml/xsl/docbook/xhtml/docbook.xsl \
         ./manual.xml
-      cp ${./style.css} $out/style.css
+      ln -s ${pkgs.docbook5_xsl}/xml/xsl/docbook/images $dst/
+      cp ${./style.css} $dst/style.css
+
+      ensureDir $out/share/man
+      xsltproc --nonet --xinclude \
+        --param man.output.in.separate.dir 1 \
+        --param man.output.base.dir "'$out/share/man/'" \
+        ${pkgs.docbook5_xsl}/xml/xsl/docbook/manpages/docbook.xsl \
+        ./man-pages.xml
+      
       ensureDir $out/nix-support
-      echo "doc manual $out manual.html" >> $out/nix-support/hydra-build-products
+      echo "doc manual $dst manual.html" >> $out/nix-support/hydra-build-products
     '';
   };
 

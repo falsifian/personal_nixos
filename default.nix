@@ -1,54 +1,22 @@
+{ configuration ? import ./lib/from-env.nix "NIXOS_CONFIG" /etc/nixos/configuration.nix
+}:
+
 let
-
-  fromEnv = name: default:
-    let env = builtins.getEnv name; in
-    if env == "" then default else env;
-  configuration = import (fromEnv "NIXOS_CONFIG" /etc/nixos/configuration.nix);
-  nixpkgs   =         fromEnv "NIXPKGS"      /etc/nixos/nixpkgs;
-
-  system = import system/system.nix { inherit configuration nixpkgs; };
+  
+  inherit
+    (import ./lib/eval-config.nix {inherit configuration;})
+    config optionDeclarations pkgs;
 
 in
 
-{ inherit (system)
-    activateConfiguration
-    bootStage2
-    etc
-    grubMenuBuilder
-    kernel
-    modulesTree
-    nix
-    system
-    systemPath
-    config
-    ;
+{
+  inherit config;
 
-  inherit (system.nixosTools)
-    nixosCheckout
-    nixosHardwareScan
-    nixosInstall
-    nixosRebuild
-    nixosGenSeccureKeys
-    ;
+  system = config.system.build.system;
 
-  inherit (system.initialRamdiskStuff)
-    bootStage1
-    extraUtils
-    initialRamdisk
-    modulesClosure
-    ;
-    
-  nixFallback = system.nix;
+  # The following are used by nixos-rebuild.
+  nixFallback = pkgs.nixUnstable;
+  manifests = config.installer.manifests;
 
-  manifests = system.config.installer.manifests; # exported here because nixos-rebuild uses it
-
-  upstartJobsCombined = system.upstartJobs;
-
-  # Make it easier to build individual Upstart jobs (e.g., "nix-build
-  # /etc/nixos/nixos -A upstartJobs.xserver").  
-  upstartJobs = { recurseForDerivations = true; } //
-    builtins.listToAttrs (map (job:
-      { name = if job ? jobName then job.jobName else job.name; value = job; }
-    ) system.upstartJobs.jobs);
-
+  tests = config.tests;
 }
