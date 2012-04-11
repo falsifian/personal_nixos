@@ -92,7 +92,7 @@ with pkgs.lib;
       diskNr=0
       diskForAufs=
       for device in /dev/xvd*; do
-          if [ "$device" = /dev/xvda1 ]; then continue; fi
+          if [ "$device" = /dev/xvda -o "$device" = /dev/xvda1 ]; then continue; fi
           fsType=$(blkid -o value -s TYPE "$device" || true)
           if [ "$fsType" = swap ]; then
               echo "activating swap device $device..."
@@ -115,11 +115,13 @@ with pkgs.lib;
           mkdir -m 1777 -p $targetRoot/$diskForAufs/root/tmp $targetRoot/tmp
           mount --bind $targetRoot/$diskForAufs/root/tmp $targetRoot/tmp
 
-          mkdir -m 755 -p $targetRoot/$diskForAufs/root/var $targetRoot/var
-          mount --bind $targetRoot/$diskForAufs/root/var $targetRoot/var
+          if [ ! -e $targetRoot/.ebs ]; then
+              mkdir -m 755 -p $targetRoot/$diskForAufs/root/var $targetRoot/var
+              mount --bind $targetRoot/$diskForAufs/root/var $targetRoot/var
 
-          mkdir -m 755 -p $targetRoot/$diskForAufs/root/nix
-          mount -t aufs -o dirs=$targetRoot/$diskForAufs/root/nix=rw:$targetRoot/nix=rr none $targetRoot/nix
+              mkdir -m 755 -p $targetRoot/$diskForAufs/root/nix
+              mount -t aufs -o dirs=$targetRoot/$diskForAufs/root/nix=rw:$targetRoot/nix=rr none $targetRoot/nix
+          fi
       fi
     '';
 

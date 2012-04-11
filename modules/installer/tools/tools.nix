@@ -17,21 +17,16 @@ let
     src = ./nixos-build-vms/nixos-build-vms.sh;
   };
 
-  nixosDeployNetwork = makeProg {
-    name = "nixos-deploy-network";
-    src = ./nixos-deploy-network/nixos-deploy-network.sh;
-  };
-
   nixosInstall = makeProg {
     name = "nixos-install";
     src = ./nixos-install.sh;
 
     inherit (pkgs) perl pathsFromGraph;
     nix = config.environment.nix;
-    nixpkgsURL = cfg.nixpkgsURL;
+    nixosURL = cfg.nixosURL;
 
     nixClosure = pkgs.runCommand "closure"
-      {exportReferencesGraph = ["refs" config.environment.nix];}
+      { exportReferencesGraph = ["refs" config.environment.nix]; }
       "cp refs $out";
   };
 
@@ -40,10 +35,12 @@ let
     src = ./nixos-rebuild.sh;
   };
 
+  /*
   nixosGenSeccureKeys = makeProg {
     name = "nixos-gen-seccure-keys";
     src = ./nixos-gen-seccure-keys.sh;
   };
+  */
 
   nixosHardwareScan = makeProg {
     name = "nixos-hardware-scan";
@@ -54,6 +51,12 @@ let
   nixosOption = makeProg {
     name = "nixos-option";
     src = ./nixos-option.sh;
+  };
+
+  nixosVersion = makeProg {
+    name = "nixos-version";
+    src = ./nixos-version.sh;
+    inherit (config.system) nixosVersion;
   };
 
   nixosGui = pkgs.xulrunnerWrapper {
@@ -81,9 +84,9 @@ in
 {
   options = {
 
-    installer.nixpkgsURL = pkgs.lib.mkOption {
-      default = "";
-      example = http://nixos.org/releases/nix/nixpkgs-0.11pre7577;
+    installer.nixosURL = pkgs.lib.mkOption {
+      default = http://nixos.org/releases/nixos/channels/nixos-unstable;
+      example = http://nixos.org/releases/nixos/nixos-0.1pre1234;
       description = ''
         URL of the Nixpkgs distribution to use when building the
         installation CD.
@@ -116,12 +119,12 @@ in
   config = {
     environment.systemPackages =
       [ nixosBuildVMS
-        nixosDeployNetwork
         nixosInstall
         nixosRebuild
         nixosHardwareScan
-        nixosGenSeccureKeys
+        #nixosGenSeccureKeys
         nixosOption
+        nixosVersion
       ] ++ pkgs.lib.optional cfg.enableGraphicalTools nixosGui;
 
     system.build = {

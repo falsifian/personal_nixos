@@ -1,5 +1,4 @@
-# This module adds Memtest86 to the Grub boot menu on the CD.  !!! It
-# would be nice if this also worked for normal configurations.
+# This module adds Memtest86 to the Grub boot menu on the CD.
 
 {config, pkgs, ...}:
 
@@ -12,7 +11,7 @@ in
 {
   boot.loader.grub.extraEntries =
     ''
-      menuentry "Memtest86+" {
+      menuentry "Memtest86" {
         linux16 ${memtestPath}
       }
     '';

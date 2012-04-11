@@ -1,21 +1,25 @@
+{ nixosSrc ? {outPath = ./.; rev = 1234;}
+, nixpkgs ? {outPath = <nixpkgs>; rev = 5678;}
+}:
+
 let
+
+  version = builtins.readFile ./.version;
+  versionSuffix = "pre${toString nixosSrc.rev}-${toString nixpkgs.rev}";
 
 
   makeIso =
     { module, type, description ? type, maintainers ? ["eelco"] }:
-    { nixosSrc ? {outPath = ./.; rev = 1234;}
-    , officialRelease ? false
-    , system ? "i686-linux"
+    { officialRelease ? false
+    , system ? builtins.currentSystem
     }:
 
     with import <nixpkgs> {inherit system;};
 
     let
 
-      version = builtins.readFile ./VERSION + (if officialRelease then "" else "pre${toString nixosSrc.rev}");
-
       versionModule =
-        { system.nixosVersion = version;
+        { system.nixosVersion = version + (lib.optionalString (!officialRelease) versionSuffix);
           isoImage.isoBaseName = "nixos-${type}";
         };
 
@@ -28,7 +32,7 @@ let
 
     in
       # Declare the ISO as a build product so that it shows up in Hydra.
-      runCommand "nixos-iso-${version}"
+      runCommand "nixos-iso-${config.system.nixosVersion}"
         { meta = {
             description = "NixOS installation CD (${description}) - ISO image for ${system}";
             maintainers = map (x: lib.getAttr x lib.maintainers) maintainers;
@@ -44,16 +48,13 @@ let
 
   makeSystemTarball =
     { module, maintainers ? ["viric"]}:
-    { nixosSrc ? {outPath = ./.; rev = 1234;}
-    , officialRelease ? false
-    , system ? "i686-linux"
+    { officialRelease ? false
+    , system ? builtins.currentSystem
     }:
 
     with import <nixpkgs> {inherit system;};
     let
-      version = builtins.readFile ./VERSION + (if officialRelease then "" else "pre${toString nixosSrc.rev}");
-
-      versionModule = { system.nixosVersion = version; };
+      versionModule = { system.nixosVersion = version + (lib.optionalString (!officialRelease) versionSuffix); };
 
       config = (import lib/eval-config.nix {
         inherit system;
@@ -75,36 +76,68 @@ let
 
 
     tarball =
-      { nixosSrc ? {outPath = ./.; rev = 1234;}
-      , officialRelease ? false
-      }:
+      { officialRelease ? false }:
 
       with import <nixpkgs> {};
 
       releaseTools.makeSourceTarball {
         name = "nixos-tarball";
 
-        version = builtins.readFile ./VERSION;
-
         src = nixosSrc;
 
-        inherit officialRelease;
+        inherit officialRelease version;
 
         distPhase = ''
+          echo -n $VERSION_SUFFIX > .version-suffix
           releaseName=nixos-$VERSION$VERSION_SUFFIX
           ensureDir "$out/tarballs"
           mkdir ../$releaseName
           cp -prd . ../$releaseName
           cd ..
+          chmod -R u+w $releaseName
           tar cfvj $out/tarballs/$releaseName.tar.bz2 $releaseName
         ''; # */
       };
 
 
+    channel =
+      { officialRelease ? false }:
+
+      with import <nixpkgs> {};
+
+      releaseTools.makeSourceTarball {
+        name = "nixos-channel";
+
+        src = nixosSrc;
+
+        inherit officialRelease version versionSuffix;
+
+        buildInputs = [ nixUnstable ];
+
+        expr =
+          ''
+            { system ? builtins.currentSystem }:
+            { pkgs = (import nixpkgs/default.nix { inherit system; }) // { recurseForDerivations = true; }; }
+          '';
+
+        distPhase = ''
+          echo -n $VERSION_SUFFIX > .version-suffix
+          releaseName=nixos-$VERSION$VERSION_SUFFIX
+          ensureDir "$out/tarballs"
+          mkdir ../$releaseName
+          cp -prd . ../$releaseName/nixos
+          cp -prd ${nixpkgs} ../$releaseName/nixpkgs
+          echo "$expr" > ../$releaseName/default.nix
+          NIX_STATE_DIR=$TMPDIR nix-env -f ../$releaseName/default.nix -qaP --meta --xml \* > /dev/null
+          cd ..
+          chmod -R u+w $releaseName
+          tar cfj $out/tarballs/$releaseName.tar.bz2 $releaseName
+        ''; # */
+      };
+
+
     manual =
-      { nixosSrc ? {outPath = ./.; rev = 1234;}
-      , officialRelease ? false
-      }:
+      { officialRelease ? false }:
 
       (import "${nixosSrc}/doc/manual" {
         pkgs = import <nixpkgs> {};
@@ -112,8 +145,7 @@ let
           (import lib/eval-config.nix {
             modules = [ { fileSystems = []; } ];
           }).options;
-        revision =
-          if nixosSrc.rev == 1234 then "HEAD" else toString nixosSrc.rev;
+        revision = toString nixosSrc.rev;
       }).manual;
 
 
@@ -149,6 +181,7 @@ let
       module = ./modules/installer/cd-dvd/system-tarball-pc.nix;
     };
 
+    /*
     system_tarball_fuloong2f =
       assert builtins.currentSystem == "mips64-linux";
       makeSystemTarball {
@@ -160,6 +193,7 @@ let
       makeSystemTarball {
         module = ./modules/installer/cd-dvd/system-tarball-sheevaplug.nix;
       } { system = "armv5tel-linux"; };
+    */
 
 
     tests =

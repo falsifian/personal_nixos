@@ -1,10 +1,11 @@
-# This module allows getting memtest86+ in grub menus.
+# This module allows getting memtest86 in grub menus.
 
 {config, pkgs, ...}:
 
 with pkgs.lib;
 let
   isEnabled = config.boot.loader.grub.memtest86;
+  memtest86 = pkgs.memtest86;
 in
 {
   options = {
@@ -18,15 +19,20 @@ in
   };
 
   config.boot.loader.grub = mkIf isEnabled {
-    extraEntries = 
+    extraEntries = if config.boot.loader.grub.version == 2 then
       ''
-        menuentry "Memtest86+" {
+        menuentry "${memtest86.name}" {
           linux16 $bootRoot/memtest.bin
         }
+      ''
+      else
+      ''
+        menuentry "${memtest86.name}"
+          linux16 $bootRoot/memtest.bin
       '';
     extraPrepareConfig =
       ''
-        cp ${pkgs.memtest86}/memtest.bin /boot/memtest.bin;
+        cp ${memtest86}/memtest.bin /boot/memtest.bin;
       '';
   };
 }

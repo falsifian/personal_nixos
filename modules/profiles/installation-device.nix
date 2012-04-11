@@ -67,13 +67,7 @@ in
   ];
 
   options = {
-    system.nixosVersion = mkOption {
-      default = "${builtins.readFile ../../VERSION}";
-      description = ''
-        NixOS version number.
-      '';
-    };
-
+  
     installer.cloneConfig = mkOption {
       default = true;
       description = ''
@@ -101,6 +95,7 @@ in
         in live CDs.
       '';
     };
+    
   };
 
   config = {
@@ -119,10 +114,6 @@ in
     # Include only the en_US locale.  This saves 75 MiB or so compared to
     # the full glibcLocales package.
     i18n.supportedLocales = ["en_US.UTF-8/UTF-8" "en_US/ISO-8859-1"];
-
-    # nixos-install will do a pull from this channel to speed up the
-    # installation.
-    installer.nixpkgsURL = http://nixos.org/releases/nixpkgs/channels/nixpkgs-unstable;
 
     boot.postBootCommands =
       ''

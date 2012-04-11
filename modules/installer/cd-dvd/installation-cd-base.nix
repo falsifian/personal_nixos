@@ -42,7 +42,9 @@ in
   # ISO naming.
   isoImage.isoName = "${config.isoImage.isoBaseName}-${config.system.nixosVersion}-${pkgs.stdenv.system}.iso";
 
-  isoImage.volumeID = "NIXOS_INSTALL_CD_${config.system.nixosVersion}";
+  isoImage.volumeID = "NIXOS_CD_${config.system.nixosVersion}";
+
+  installer.nixosURL = "http://nixos.org/releases/nixos/nixos-${config.system.nixosVersion}";
 
   boot.postBootCommands =
     ''
@@ -57,6 +59,8 @@ in
         mkdir -p /etc/nixos/nixpkgs
         tar xjf ${nixpkgsTarball}/nixpkgs.tar.bz2 -C /etc/nixos/nixpkgs
         chown -R root.root /etc/nixos
+        echo -n ${config.system.nixosVersion} > /etc/nixos/nixos/.version
+        echo -n "" > /etc/nixos/nixos/.version-suffix
      ''}
 
      # Make the installer more likely to succeed in low memory

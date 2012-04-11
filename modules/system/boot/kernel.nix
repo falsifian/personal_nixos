@@ -160,14 +160,14 @@ let kernel = config.boot.kernelPackages.kernel; in
 
         # Misc. stuff.
         "pcips2" "serio" "atkbd" "xtkbd"
+
+        # To wait for SCSI devices to appear.
+        "scsi_wait_scan"
       ];
 
     boot.initrd.kernelModules =
       [ # For LVM.
         "dm_mod"
-
-        # For usual AT keyboards.
-        "i8042"
       ];
 
     # The Linux kernel >= 2.6.27 provides firmware.

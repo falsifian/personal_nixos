@@ -94,7 +94,7 @@ let
       createDisk("harddisk", 4 * 1024);
 
       my $machine = createMachine({ hda => "harddisk", cdrom => glob("${iso}/iso/*.iso"),
-        qemuFlags => '${optionalString testChannel (toString (qemuNICFlags 1 1 2))}'});
+        qemuFlags => '${optionalString testChannel (toString (qemuNICFlags 1 1 2))} ${optionalString (pkgs.stdenv.system == "x86_64-linux") "-cpu kvm64"}'});
       $machine->start;
 
       ${optionalString testChannel ''
@@ -122,7 +122,7 @@ let
             "rm /etc/hosts",
             "echo 192.168.1.1 nixos.org > /etc/hosts",
             "ifconfig eth1 up 192.168.1.2",
-            "nix-pull http://nixos.org/releases/nixpkgs/channels/nixpkgs-unstable/MANIFEST",
+            "nixos-rebuild pull",
         );
 
         # Test nix-env.
