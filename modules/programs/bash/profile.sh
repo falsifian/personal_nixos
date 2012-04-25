@@ -14,8 +14,8 @@ export __ETC_PROFILE_DONE=1
 # Initialise a bunch of environment variables.
 export LOCALE_ARCHIVE=/var/run/current-system/sw/lib/locale/locale-archive
 export LD_LIBRARY_PATH=/var/run/opengl-driver/lib:/var/run/opengl-driver-32/lib # !!! only set if needed
-export NIXPKGS_CONFIG=/nix/etc/config.nix
-export NIX_PATH=nixpkgs=/etc/nixos/nixpkgs:nixos=/etc/nixos/nixos:nixos-config=/etc/nixos/configuration.nix:services=/etc/nixos/services
+export NIXPKGS_CONFIG=/etc/nix/nixpkgs-config.nix
+export NIX_PATH=/nix/var/nix/profiles/per-user/root/channels/nixos:nixpkgs=/etc/nixos/nixpkgs:nixos=/etc/nixos/nixos:nixos-config=/etc/nixos/configuration.nix:services=/etc/nixos/services
 export PAGER="less -R"
 export EDITOR=nano
 export LOCATE_PATH=/var/cache/locatedb
@@ -85,6 +85,11 @@ if ! test -L $HOME/.nix-profile; then
     fi
 fi
 
+# Subscribe the root user to the NixOS channel by default.
+if [ "$USER" = root -a ! -e $HOME/.nix-channels ]; then
+    echo "http://nixos.org/releases/nixos/channels/nixos-unstable nixos" > $HOME/.nix-channels
+fi
+
 # Create the per-user garbage collector roots directory.
 NIX_USER_GCROOTS_DIR=/nix/var/nix/gcroots/per-user/$USER
 mkdir -m 0755 -p $NIX_USER_GCROOTS_DIR
@@ -93,13 +98,12 @@ if test "$(stat --printf '%u' $NIX_USER_GCROOTS_DIR)" != "$(id -u)"; then
 fi
 
 # Set up a default Nix expression from which to install stuff.
-if test ! -e $HOME/.nix-defexpr -o -L $HOME/.nix-defexpr; then
+if [ ! -e $HOME/.nix-defexpr -o -L $HOME/.nix-defexpr ]; then
     echo "creating $HOME/.nix-defexpr" >&2
     rm -f $HOME/.nix-defexpr
     mkdir $HOME/.nix-defexpr
-    ln -s /etc/nixos/nixpkgs $HOME/.nix-defexpr/nixpkgs_sys
-    if test "$USER" != root; then
-        ln -s /nix/var/nix/gcroots/per-user/root/channels $HOME/.nix-defexpr/channels_root
+    if [ "$USER" != root ]; then
+        ln -s /nix/var/nix/profiles/per-user/root/channels $HOME/.nix-defexpr/channels_root
     fi
 fi
 

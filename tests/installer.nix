@@ -22,6 +22,7 @@ let
               [ pkgs.glibcLocales
                 pkgs.sudo
                 pkgs.docbook5
+                pkgs.grub
               ];
           }
         ];
@@ -29,7 +30,7 @@ let
 
 
   # The configuration to install.
-  config = { fileSystems, testChannel }: pkgs.writeText "configuration.nix"
+  config = { fileSystems, testChannel, grubVersion }: pkgs.writeText "configuration.nix"
     ''
       { config, pkgs, modulesPath, ... }:
 
@@ -38,7 +39,10 @@ let
             "''${modulesPath}/testing/test-instrumentation.nix"
           ];
 
-        boot.loader.grub.version = 2;
+        boot.loader.grub.version = ${toString grubVersion};
+        ${optionalString (grubVersion == 1) ''
+          boot.loader.grub.splashImage = null;
+        ''}
         boot.loader.grub.device = "/dev/vda";
         boot.loader.grub.extraConfig = "serial; terminal_output.serial";
         boot.initrd.kernelModules = [ "ext3" "virtio_console" ];
@@ -73,7 +77,7 @@ let
     { services.httpd.enable = true;
       services.httpd.adminAddr = "foo@example.org";
       services.httpd.servedDirs = singleton
-        { urlPath = "/releases/nixpkgs/channels/nixpkgs-unstable";
+        { urlPath = "/releases/nixos/channels/nixos-unstable";
           dir = "/tmp/channel";
         };
 
@@ -89,7 +93,7 @@ let
   # a test script fragment `createPartitions', which must create
   # partitions and filesystems, and a configuration.nix fragment
   # `fileSystems'.
-  testScriptFun = { createPartitions, fileSystems, testChannel }:
+  testScriptFun = { createPartitions, fileSystems, testChannel, grubVersion }:
     ''
       createDisk("harddisk", 4 * 1024);
 
@@ -105,7 +109,7 @@ let
         $webserver->mustSucceed("mkdir /tmp/channel");
         $webserver->mustSucceed(
             "nix-push file:///tmp/channel " .
-            "http://nixos.org/releases/nixpkgs/channels/nixpkgs-unstable " .
+            "http://nixos.org/releases/nixos/channels/nixos-unstable " .
             "file:///tmp/channel/MANIFEST ${toString channelContents} >&2");
       ''}
 
@@ -145,13 +149,17 @@ let
       print STDERR "Result of the hardware scan:\n$cfg\n";
 
       $machine->copyFileFromHost(
-          "${ config { inherit fileSystems testChannel; } }",
+          "${ config { inherit fileSystems testChannel grubVersion; } }",
           "/mnt/etc/nixos/configuration.nix");
 
+      # Hack to get GRUB 1 to install on virtio.  GRUB 1 has a patch
+      # from Gentoo to support virtio, but it's incomplete: it doesn't
+      # detect /dev/vd* automatically.  And we don't care enough about
+      # GRUB 1 to fix it.
+      $machine->mustSucceed("mkdir -p /mnt/boot/grub; echo '(hd0) /dev/vda' > /mnt/boot/grub/device.map");
+      
       # Perform the installation.
       $machine->mustSucceed("nixos-install >&2");
-
-      $machine->mustSucceed("cat /mnt/boot/grub/grub.cfg >&2");
 
       $machine->shutdown;
 
@@ -161,7 +169,7 @@ let
       # Did /boot get mounted, if appropriate?
       # !!! There is currently no good way to wait for the
       # `filesystems' task to finish.
-      $machine->waitForFile("/boot/grub/grub.cfg");
+      $machine->waitForFile("/boot/grub");
 
       # Did the swap device get activated?
       # !!! Idem.
@@ -173,8 +181,6 @@ let
 
       $machine->mustSucceed("nixos-rebuild switch >&2");
 
-      $machine->mustSucceed("cat /boot/grub/grub.cfg >&2");
-
       $machine->shutdown;
 
       # And just to be sure, check that the machine still boots after
@@ -185,11 +191,11 @@ let
     '';
 
 
-  makeTest = { createPartitions, fileSystems, testChannel ? false }:
+  makeTest = { createPartitions, fileSystems, testChannel ? false, grubVersion ? 2 }:
     { inherit iso;
       nodes = if testChannel then { inherit webserver; } else { };
       testScript = testScriptFun {
-        inherit createPartitions fileSystems testChannel;
+        inherit createPartitions fileSystems testChannel grubVersion;
       };
     };
 
@@ -299,6 +305,25 @@ in {
       fileSystems = rootFS + bootFS;
     };
 
+  # Test a basic install using GRUB 1.
+  grub1 = makeTest
+    { createPartitions =
+        ''
+          $machine->mustSucceed(
+              "parted /dev/vda mklabel msdos",
+              "parted /dev/vda -- mkpart primary linux-swap 1M 1024M",
+              "parted /dev/vda -- mkpart primary ext2 1024M -1s",
+              "udevadm settle",
+              "mkswap /dev/vda1 -L swap",
+              "swapon -L swap",
+              "mkfs.ext3 -L nixos /dev/vda2",
+              "mount LABEL=nixos /mnt",
+          );
+        '';
+      fileSystems = rootFS;
+      grubVersion = 1;
+    };
+
   # Rebuild the CD configuration with a little modification.
   rebuildCD =
     { inherit iso;
@@ -318,7 +343,7 @@ in {
           print STDERR "New CD config:\n$cfg\n";
 
           # Apply the new CD configuration.
-          $machine->mustSucceed("nixos-rebuild test --no-pull");
+          $machine->mustSucceed("nixos-rebuild test");
 
           # Connect to it-self.
           #$machine->waitForJob("sshd");

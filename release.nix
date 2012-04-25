@@ -114,11 +114,7 @@ let
 
         buildInputs = [ nixUnstable ];
 
-        expr =
-          ''
-            { system ? builtins.currentSystem }:
-            { pkgs = (import nixpkgs/default.nix { inherit system; }) // { recurseForDerivations = true; }; }
-          '';
+        expr = builtins.readFile lib/channel-expr.nix;
 
         distPhase = ''
           echo -n $VERSION_SUFFIX > .version-suffix
@@ -205,18 +201,20 @@ let
         bittorrent = t.bittorrent.test;
         firefox = t.firefox.test;
         firewall = t.firewall.test;
+        installer.grub1 = t.installer.grub1.test;
         installer.lvm = t.installer.lvm.test;
+        installer.rebuildCD = t.installer.rebuildCD.test;
         installer.separateBoot = t.installer.separateBoot.test;
         installer.simple = t.installer.simple.test;
         installer.simple_64 = t_64.installer.simple.test;
         installer.swraid = t.installer.swraid.test;
-        installer.rebuildCD = t.installer.rebuildCD.test;
         ipv6 = t.ipv6.test;
         kde4 = t.kde4.test;
         login = t.login.test;
+        misc = t.misc.test;
         mpich = t.mpich.test;
-	mysql = t.mysql.test;
-	mysql_replication = t.mysql_replication.test;
+        mysql = t.mysql.test;
+        mysql_replication = t.mysql_replication.test;
         nat = t.nat.test;
         nfs = t.nfs.test;
         openssh = t.openssh.test;
